@@ -2,106 +2,125 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import time
-import webbrowser
-import urllib.parse
 import os
-# SES KÜTÜPHANESİ (Yüklemiş olman lazım: pip install streamlit-mic-recorder)
-from streamlit_mic_recorder import mic_recorder
+from PIL import Image
+
+# --- MODEREN MÜHENDİSLİK | V25 ---
+st.set_page_config(page_title="MODEREN Üretim Portalı", layout="wide", page_icon="🏗️")
+
+# --- 🎨 PRESTİJ TASARIM VE LOGO STİLİ ---
+st.markdown("""
+    <style>
+    .stApp { background-color: #0d1117; color: #c9d1d9; }
+    
+    /* Logo Alanı */
+    .header-container {
+        text-align: center;
+        padding: 30px;
+        background: linear-gradient(180deg, #161b22 0%, #0d1117 100%);
+        border-radius: 0 0 30px 30px;
+        border-bottom: 3px solid #58a6ff;
+        margin-bottom: 25px;
+    }
+    
+    .logo-text {
+        font-size: 50px;
+        font-weight: 900;
+        color: #ffffff;
+        letter-spacing: 4px;
+        text-shadow: 0px 0px 15px rgba(88, 166, 255, 0.6);
+    }
+
+    /* Giriş Butonları */
+    .stButton>button {
+        border-radius: 15px;
+        font-size: 18px !important;
+        font-weight: bold;
+        height: 80px !important;
+        transition: 0.4s;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- AYARLAR ---
-st.set_page_config(page_title="MODEREN Lazer V5", layout="wide", page_icon="🎙️")
-DB_FILE = "moderen_database_v5.csv"
-MUHENDIS_TEL = "+905511254762" 
-MESAI_SANIYE = 36900 # 08:00 - 18:15
+USTA_SIFRE = "moderen38"
+DB_FILE = "moderen_aktif_gun.csv"
+INSTA_LINK = "https://www.instagram.com/moderen_muhendislik"
+LOGO_PATH = "logo.png"
 
+if 'sayfa' not in st.session_state: st.session_state.sayfa = "ANA_SAYFA"
+if 'auth' not in st.session_state: st.session_state.auth = False
+
+# Fonksiyonlar
 def format_sure(saniye):
     hrs, rem = divmod(int(saniye), 3600)
     mins, secs = divmod(rem, 60)
     return f"{hrs:02d}:{mins:02d}:{secs:02d}"
 
-st.title("🚀 MODEREN Mühendislik | Sesli Asistan")
+def logo_koy(width=200):
+    if os.path.exists(LOGO_PATH):
+        try:
+            image = Image.open(LOGO_PATH)
+            st.image(image, width=width)
+        except: pass # Logo açılmazsa hata verme
 
-# --- ÜST PANEL (VERİMLİLİK) ---
-if os.path.exists(DB_FILE):
-    df_all = pd.read_csv(DB_FILE)
-    bugun = datetime.now().strftime("%d/%m/%Y")
-    bugun_df = df_all[df_all['Tarih'].str.contains(bugun)]
-    toplam_s = bugun_df['Saniye_Ham'].sum() if not bugun_df.empty else 0
-    oran = (toplam_s / MESAI_SANIYE) * 100
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Toplam Kesim", format_sure(toplam_s))
-    m2.metric("Çalışma Oranı", f"%{oran:.2f}")
-    m3.progress(min(oran/100, 1.0))
-else:
-    toplam_s = 0
-
-st.divider()
-
-# --- SESLİ KOMUT MERKEZİ ---
-st.subheader("🎙️ Sesli Kontrol (Başla / Durdur / Kaydet)")
-ses_verisi = mic_recorder(start_prompt="Sesli Komut Ver", stop_prompt="Dinlemeyi Bitir", key='recorder')
-
-if 'start' not in st.session_state: st.session_state.start = None
-if 'current_s' not in st.session_state: st.session_state.current_s = 0
-
-if ses_verisi:
-    komut = ses_verisi['text'].lower()
-    st.write(f"Anlaşılan: *{komut}*")
+# --- [1] ANA SAYFA (GİRİŞ EKRANI) ---
+if st.session_state.sayfa == "ANA_SAYFA":
+    st.markdown("""
+        <div class="header-container">
+            <div class="logo-text">MODEREN MÜHENDİSLİK</div>
+            <div style="color:#58a6ff; font-size:20px;">Lazer Kesim & Hassas Mühendislik</div>
+        </div>
+    """, unsafe_allow_html=True)
     
-    if "başla" in komut or "başlat" in komut:
-        st.session_state.start = time.time()
-        st.success("Kesim Başlatıldı!")
-    elif "durdur" in komut or "bitir" in komut:
-        if st.session_state.start:
-            st.session_state.current_s = int(time.time() - st.session_state.start)
-            st.session_state.start = None
-            st.warning("Kesim Durduruldu!")
-    elif "kaydet" in komut:
-        st.info("Kayıt işlemi tetikleniyor...")
-        # Kayıt mantığı burada da çalıştırılabilir
-
-# --- MANUEL PANEL ---
-col_sol, col_sag = st.columns([2, 1])
-
-with col_sol:
-    st.subheader("📋 Kesim Girişi")
-    c1, c2, c3 = st.columns(3)
-    malzeme = c1.text_input("Parça Adı", "Parça 1")
-    cins = c2.selectbox("Cins", ["Siyah Sac", "Paslanmaz", "Alüminyum"])
-    kalinlik = c3.number_input("mm", 0.5, 50.0, 5.0)
-
-    st.write(f"## ⏱️ {format_sure(st.session_state.current_s)}")
+    # Giriş ekranında logonun büyük hali
+    c_l, c_log, c_r = st.columns([1, 2, 1])
+    with c_log:
+        logo_koy(width=350)
     
-    b1, b2, b3 = st.columns(3)
-    if b1.button("▶️ BAŞLAT"):
-        st.session_state.start = time.time()
-    if b2.button("⏹️ BİTİR"):
-        if st.session_state.start:
-            st.session_state.current_s = int(time.time() - st.session_state.start)
-            st.session_state.start = None
-    if b3.button("💾 KAYDET", type="primary"):
-        tarih = datetime.now().strftime("%d/%m/%Y %H:%M")
-        yeni = {"Tarih": tarih, "Malzeme": malzeme, "Cins": cins, "Süre": format_sure(st.session_state.current_s), "Saniye_Ham": st.session_state.current_s}
-        df = pd.DataFrame([yeni])
-        if os.path.exists(DB_FILE):
-            df = pd.concat([pd.read_csv(DB_FILE), df], ignore_index=True)
-        df.to_csv(DB_FILE, index=False)
-        st.success("Kaydedildi!")
-        st.rerun()
+    st.write("<br>", unsafe_allow_html=True)
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("<h3 style='text-align:center;'>👨‍🔧 ÜRETİM HATTI</h3>", unsafe_allow_html=True)
+        if st.button("USTA PANELİNE GİRİŞ", use_container_width=True):
+            st.session_state.sayfa = "USTA_GIRIS"; st.rerun()
+    with c2:
+        st.markdown("<h3 style='text-align:center;'>📊 ANALİZ VE TAKİP</h3>", unsafe_allow_html=True)
+        if st.button("MÜHENDİS PANELİNE GİRİŞ", use_container_width=True):
+            st.session_state.sayfa = "MUHENDIS_PANELI"; st.rerun()
 
-with col_sag:
-    st.subheader("🛠️ Hata Kodu")
-    hata = st.text_input("Bodor Hata Kodu").upper()
-    sozluk = {"E28": "Kafa Çarpma!", "E510": "Sürücü Hatası!", "E100": "Gaz Düşük!"}
-    if hata: st.error(sozluk.get(hata, "Bilinmeyen Kod"))
+# --- [2] USTA GİRİŞ ---
+elif st.session_state.sayfa == "USTA_GIRIS":
+    st.title("🔐 Usta Giriş Doğrulama")
+    sifre = st.text_input("Şifre", type="password")
+    
+    col_b1, col_b2 = st.columns(2)
+    if col_b1.button("✅ GİRİŞ YAP", use_container_width=True, type="primary"):
+        if sifre == USTA_SIFRE:
+            st.session_state.auth = True; st.session_state.sayfa = "USTA_PANELI"; st.rerun()
+        else: st.error("Hatalı!")
+    if col_b2.button("🔙 ANA SAYFAYA DÖN", use_container_width=True):
+        st.session_state.sayfa = "ANA_SAYFA"; st.rerun()
 
-# --- GÜN SONU ---
-st.divider()
-if st.button("🚀 GÜN SONU RAPORUNU MÜHENDİSE AT"):
-    if os.path.exists(DB_FILE):
-        bugun_str = datetime.now().strftime("%d/%m/%Y")
-        msg = f"🚀 *GÜN SONU RAPORU*\n📅 *Tarih:* {bugun_str}\n📊 *Verim:* %{oran:.2f}\n⏱️ *Toplam:* {format_sure(toplam_s)}"
-        link = f"https://wa.me/{MUHENDIS_TEL}?text={urllib.parse.quote(msg)}"
-        webbrowser.open(link)
+# --- [3] USTA PANELİ ---
+elif st.session_state.sayfa == "USTA_PANELI" and st.session_state.auth:
+    with st.sidebar:
+        logo_koy(width=150) # Sidebar'da logo
+        st.header("👷 Eren Usta")
+        if st.button("🔴 Çıkış"):
+            st.session_state.auth = False; st.session_state.sayfa = "ANA_SAYFA"; st.rerun()
 
-st.dataframe(pd.read_csv(DB_FILE).sort_index(ascending=False) if os.path.exists(DB_FILE) else pd.DataFrame())
+    st.title("🕹️ Üretim Komut Merkezi")
+    st.info("Sayaçlar ve kayıtlar burada aktif.")
+
+# --- [4] MÜHENDİS PANELİ ---
+elif st.session_state.sayfa == "MUHENDIS_PANELI":
+    with st.sidebar:
+        logo_koy(width=150) # Sidebar'da logo
+        st.header("📊 Mühendis")
+        if st.button("🔙 Ana Menü"):
+            st.session_state.sayfa = "ANA_SAYFA"; st.rerun()
+
+    st.title("🏗️ Mühendislik Takip Ekranı")
+    st.success("Tüm üretim verileri burada.")
