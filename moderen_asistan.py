@@ -5,13 +5,14 @@ import time
 from datetime import datetime
 
 # --- GENEL AYARLAR ---
-st.set_page_config(page_title="MODEREN LAZER ERP V67", layout="wide")
+st.set_page_config(page_title="MODEREN MÜHENDİSLİK ERP", layout="wide")
 DB_FILE = "moderen_lazer_kayit.csv"
 STOK_FILE = "sac_stok_listesi.csv"
 
-# --- YENİ ŞİFRELER ---
-SIFRE_USTA = "USTA"
-SIFRE_MUHENDIS = "ŞAHİN"
+# --- ÖZEL ŞİFRELER ---
+PASS_USTA_PANELI = "moderen38"
+PASS_DEPO = "USTA"
+PASS_ANALIZ = "ŞAHİN"
 
 GUNLUK_MESAI_DK = 615
 
@@ -62,15 +63,27 @@ veritabani_hazirla()
 if "k_baslangic" not in st.session_state:
     st.session_state.update({"k_baslangic": None, "k_toplam": 0, "a_baslangic": None, "a_toplam": 0, "ilk_start": None, "secilen_tip_index": 0})
 
-st.sidebar.title("🚜 MODEREN LAZER")
+# --- REKLAM VE SIDEBAR ---
+st.sidebar.markdown("<h1 style='text-align: center; color: #FF4B4B;'>🏗️ MODEREN</h1>", unsafe_allow_html=True)
+st.sidebar.markdown("<h3 style='text-align: center; margin-top: -20px;'>Mühendislik</h3>", unsafe_allow_html=True)
+st.sidebar.markdown("---")
+
 menu = st.sidebar.selectbox("Bölüm Seçiniz:", ["🛠️ Usta Paneli", "📦 Depo Bölümü", "📊 Mühendis Analiz"])
 
-# --- 🛠️ USTA PANELİ (USTA ŞİFRELİ) ---
+# --- 🛠️ USTA PANELİ ---
 if menu == "🛠️ Usta Paneli":
-    if st.sidebar.text_input("Usta Şifresi:", type="password") == SIFRE_USTA:
+    sifre = st.sidebar.text_input("Usta Şifresi:", type="password")
+    if sifre == PASS_USTA_PANELI:
+        st.markdown("<h2 style='color: #FF4B4B;'>🏗️ MODEREN MÜHENDİSLİK</h2>", unsafe_allow_html=True)
         st.title("🕹️ Üretim Takip")
+        
         c1, c2, c3 = st.columns(3)
-        kesim_p, ariza_p, verim_p = c1.empty(), c2.empty(), c3.empty()
+        curr_k = st.session_state.k_toplam + (time.time() - st.session_state.k_baslangic if st.session_state.k_baslangic else 0)
+        curr_a = st.session_state.a_toplam + (time.time() - st.session_state.a_baslangic if st.session_state.a_baslangic else 0)
+        
+        c1.metric("⚡ KESİM", hms_format(curr_k))
+        c2.metric("🚨 ARZA", hms_format(curr_a))
+        c3.metric("📊 VERİM", f"%{round((curr_k/(GUNLUK_MESAI_DK*60)*100),1)}")
         
         b1, b2, b3, b4 = st.columns(4)
         if st.session_state.k_baslangic is None:
@@ -95,15 +108,7 @@ if menu == "🛠️ Usta Paneli":
             st.session_state.k_baslangic = st.session_state.a_baslangic = None; st.rerun()
 
         if b4.button("🔄 SIFIRLA", use_container_width=True):
-            if st.checkbox("Sıfırlama Onayı"):
-                st.session_state.update({"k_toplam": 0, "a_toplam": 0, "k_baslangic": None, "a_baslangic": None, "ilk_start": None}); st.rerun()
-
-        curr_k = st.session_state.k_toplam + (time.time() - st.session_state.k_baslangic if st.session_state.k_baslangic else 0)
-        curr_a = st.session_state.a_toplam + (time.time() - st.session_state.a_baslangic if st.session_state.a_baslangic else 0)
-        kesim_p.metric("⚡ KESİM", hms_format(curr_k)); ariza_p.metric("🚨 ARZA", hms_format(curr_a))
-        verim_p.metric("📊 VERİM", f"%{round((curr_k/(GUNLUK_MESAI_DK*60)*100),1)}")
-        
-        if st.session_state.k_baslangic or st.session_state.a_baslangic: time.sleep(1); st.rerun()
+            st.session_state.update({"k_toplam": 0, "a_toplam": 0, "k_baslangic": None, "a_baslangic": None, "ilk_start": None}); st.rerun()
 
         st.markdown("---")
         st_df = pd.read_csv(STOK_FILE)
@@ -117,7 +122,6 @@ if menu == "🛠️ Usta Paneli":
         
         with st.form("kayit_formu"):
             f_is = st.text_input("Parça / İş Adı")
-            st.write("⏱️ **Verilen Süre**")
             v1, v2, v3 = st.columns(3)
             vs, vd, vsn = v1.number_input("Saat", 0), v2.number_input("Dk", 0), v3.number_input("Sn", 0)
 
@@ -126,41 +130,47 @@ if menu == "🛠️ Usta Paneli":
                 if f_is and st.session_state.ilk_start and mevcut > 0:
                     df = pd.read_csv(DB_FILE)
                     v_toplam_sn = (vs * 3600) + (vd * 60) + vsn
+                    kesim_sn = int(st.session_state.k_toplam)
                     yeni_is = {'Tarih': datetime.now().strftime("%d-%m-%Y"), 'Baslama': st.session_state.ilk_start, 'Bitis': datetime.now().strftime("%H:%M:%S"),
-                               'Is_Adi': f_is, 'Sac_Tipi': secilen_kat, 'Olcu': temiz_olcu, 'Kesim_Suresi': hms_format(st.session_state.k_toplam),
-                               'Verilen_Sure': f"{vs:02d}:{vd:02d}:{vsn:02d}", 'Fark_Sn': int(st.session_state.k_toplam) - v_toplam_sn,
-                               'Verim_%': round((st.session_state.k_toplam/(615*60)*100), 2)}
+                               'Is_Adi': f_is, 'Sac_Tipi': secilen_kat, 'Olcu': temiz_olcu, 'Kesim_Suresi': hms_format(kesim_sn),
+                               'Verilen_Sure': f"{vs:02d}:{vd:02d}:{vsn:02d}", 'Fark_Sn': kesim_sn - v_toplam_sn, 'Verim_%': round((kesim_sn/(615*60)*100), 2)}
                     pd.concat([df, pd.DataFrame([yeni_is])], ignore_index=True).to_csv(DB_FILE, index=False)
                     st_df.loc[(st_df['Kategori'] == secilen_kat) & (st_df['Olcu'] == temiz_olcu), 'Adet'] -= 1
-                    st_df.to_csv(STOK_FILE, index=False); st.success("Kayıt Başarılı!"); time.sleep(1); st.rerun()
-                else: st.error("Bilgileri kontrol edin veya stok yetersiz!")
-    else: st.info("Usta paneline erişmek için şifre giriniz.")
+                    st_df.to_csv(STOK_FILE, index=False); st.success("Kaydedildi!"); time.sleep(1); st.rerun()
+                else: st.error("Eksik bilgi veya stok yetersiz!")
+        if st.session_state.k_baslangic or st.session_state.a_baslangic: time.sleep(1); st.rerun()
+    elif sifre != "":
+        st.sidebar.error("Hatalı Şifre!")
 
-# --- 📦 DEPO BÖLÜMÜ (USTA ŞİFRELİ) ---
+# --- 📦 DEPO BÖLÜMÜ ---
 elif menu == "📦 Depo Bölümü":
-    st.title("📦 Mal Kabul")
-    if st.sidebar.text_input("Depo Yetki Şifresi (USTA):", type="password") == SIFRE_USTA:
+    sifre = st.sidebar.text_input("Depo Şifresi:", type="password")
+    if sifre == PASS_DEPO:
+        st.markdown("<h2 style='color: #FF4B4B;'>📦 MODEREN MÜHENDİSLİK</h2>", unsafe_allow_html=True)
+        st.title("Mal Kabul ve Stok")
         st_df = pd.read_csv(STOK_FILE)
         col_a, col_b = st.columns(2)
-        g_kat = col_a.selectbox("Gelen Sac Cinsi", list(KATALOG.keys()))
+        g_kat = col_a.selectbox("Cins", list(KATALOG.keys()))
         g_olcu = col_b.selectbox("Ölçü", KATALOG[g_kat])
-        g_adet = st.number_input("Depodaki Toplam Adet", min_value=0, step=1)
-        if st.button("📥 Stok Sayısını Güncelle", use_container_width=True):
+        g_adet = st.number_input("Toplam Adet", min_value=0, step=1)
+        if st.button("📥 Stok Güncelle"):
             st_df.loc[(st_df['Kategori'] == g_kat) & (st_df['Olcu'] == g_olcu), 'Adet'] = g_adet
-            st_df.to_csv(STOK_FILE, index=False); st.success("Stok güncellendi!")
-        st.markdown("---")
+            st_df.to_csv(STOK_FILE, index=False); st.success("Güncellendi!")
         st.dataframe(st_df, use_container_width=True)
-    else: st.error("Bu bölüme sadece USTA şifresi ile girilebilir!")
+    elif sifre != "":
+        st.sidebar.error("Hatalı Şifre!")
 
-# --- 📊 MÜHENDİS ANALİZ (ŞAHİN ŞİFRELİ) ---
+# --- 📊 MÜHENDİS ANALİZ ---
 elif menu == "📊 Mühendis Analiz":
-    st.title("📊 Üretim Geçmişi (Analiz)")
-    if st.sidebar.text_input("Mühendis Şifresi (ŞAHİN):", type="password") == SIFRE_MUHENDIS:
+    sifre = st.sidebar.text_input("Analiz Şifresi:", type="password")
+    if sifre == PASS_ANALIZ:
+        st.markdown("<h2 style='color: #FF4B4B;'>📊 MODEREN MÜHENDİSLİK</h2>", unsafe_allow_html=True)
+        st.title("Üretim Verileri")
         if os.path.exists(DB_FILE):
             df = pd.read_csv(DB_FILE)
             st.dataframe(df.sort_index(ascending=False), use_container_width=True)
-            if st.button("🧹 Tüm Kayıtları Temizle"):
-                if st.checkbox("Tüm verileri silmeyi onaylıyorum"):
-                    pd.DataFrame(columns=['Tarih', 'Baslama', 'Bitis', 'Is_Adi', 'Sac_Tipi', 'Olcu', 'Kesim_Suresi', 'Verilen_Sure', 'Fark_Sn', 'Verim_%']).to_csv(DB_FILE, index=False)
-                    st.rerun()
-    else: st.error("Bu bölüme sadece ŞAHİN şifresi ile girilebilir!")
+            if st.button("🧹 TABLOYU SIFIRLA VE ONAR"):
+                pd.DataFrame(columns=['Tarih', 'Baslama', 'Bitis', 'Is_Adi', 'Sac_Tipi', 'Olcu', 'Kesim_Suresi', 'Verilen_Sure', 'Fark_Sn', 'Verim_%']).to_csv(DB_FILE, index=False)
+                st.success("Sistem Onarıldı!"); st.rerun()
+    elif sifre != "":
+        st.sidebar.error("Hatalı Şifre!")
